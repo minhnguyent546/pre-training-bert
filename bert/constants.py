@@ -1,6 +1,8 @@
 from typing import List
 
 
+WORD_PIECE_SUBWORD_PREFIX = '##'
+
 class SpecialToken:
     MASK = '[MASK]'
     CLS = '[CLS]'
@@ -11,11 +13,9 @@ class SpecialToken:
     @classmethod
     def all(cls) -> List[str]:
         return [
-        SpecialToken.MASK,
-        SpecialToken.CLS,
-        SpecialToken.SEP,
-        SpecialToken.UNK,
-        SpecialToken.PAD
-    ]
-
-WORD_PIECE_SUBWORD_PREFIX = '##'
+            SpecialToken.MASK,
+            SpecialToken.CLS,
+            SpecialToken.SEP,
+            SpecialToken.UNK,
+            SpecialToken.PAD
+        ]

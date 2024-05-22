@@ -24,7 +24,6 @@ def train_opts(parser):
     _add_training_opts(parser)
 
 
-
 def _add_general_opts(parser: argparse.ArgumentParser) -> None:
     group = parser.add_argument_group('General options')
     group.add_argument(

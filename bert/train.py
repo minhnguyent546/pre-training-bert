@@ -67,7 +67,7 @@ def train_model(args: argparse.Namespace):
         print(f'Loading states from checkpoint {args.from_checkpoint}')
 
         checkpoint_states = torch.load(args.from_checkpoint, map_location=device)
-        required_keys = ['model', 'optimizer', 'scheduler', 'config']
+        required_keys = ['model', 'optimizer', 'lr_scheduler', 'config']
         for key in required_keys:
             if key not in checkpoint_states:
                 raise ValueError(f'Missing key "{key}" in checkpoint')
@@ -93,7 +93,7 @@ def train_model(args: argparse.Namespace):
     if checkpoint_states is not None:
         model.load_state_dict(checkpoint_states['model'])
         optimizer.load_state_dict(checkpoint_states['optimizer'])
-        lr_scheduler.load_state_dict(checkpoint_states['scheduler'])
+        lr_scheduler.load_state_dict(checkpoint_states['lr_scheduler'])
         if 'global_step' in checkpoint_states:
             initial_global_step = checkpoint_states['global_step']
         if 'accum_train_mlm_loss' in checkpoint_states:
