@@ -187,7 +187,7 @@ def write_training_instances_to_json(
         segment_ids = instance.segment_ids
         masked_positions = instance.masked_positions
         is_next = instance.is_next
-        masked_weights = [1.0] * len(masked_positions)
+        masked_weights = [1.0] * len(masked_positions)  # true masked tokens have weight 1.0, padding tokens have weight 0.0
 
         # we will pad `input_ids`, `input_mask`, and `segment_ids` `to max_seq_length`
         # so they can be batched together

@@ -17,7 +17,12 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from model import BertBase, BertConfig, BertForPretraining, LayerNorm
+from model import (
+    BertBase,
+    BertConfig,
+    BertForPretraining,
+    LayerNorm,
+)
 import opts
 import utils
 
@@ -136,7 +141,7 @@ def train_model(args: argparse.Namespace):
             masked_positions = batch['masked_positions'].to(device)
             masked_label_ids = batch['masked_label_ids'].to(device)
             masked_weights = batch['masked_weights'].to(device)
-            next_sentence_label = batch['next_sentence_label'].to(device)
+            next_sentence_labels = batch['next_sentence_label'].to(device)
             optimizer.zero_grad()
 
             with autocast_context:
@@ -147,9 +152,16 @@ def train_model(args: argparse.Namespace):
                     masked_positions=masked_positions,
                     masked_label_ids=masked_label_ids,
                     masked_weights=masked_weights,
-                    next_sentence_label=next_sentence_label,
+                    next_sentence_labels=next_sentence_labels,
                 )
                 loss = masked_lm_loss + nsp_loss
+
+            masked_lm_acc = utils.compute_mlm_acc(
+                masked_lm_logits,
+                masked_label_ids,
+                masked_weights,
+            )
+            nsp_acc = utils.compute_nsp_acc(nsp_logits, next_sentence_labels)
 
             scaler.scale(loss).backward()
 
@@ -168,7 +180,6 @@ def train_model(args: argparse.Namespace):
             train_progress_bar.set_postfix({
                 'mlm_loss': masked_lm_loss.item(),
                 'nsp_loss': nsp_loss.item(),
-                'total_loss': loss.item(),
             })
             accum_train_mlm_loss += masked_lm_loss.item()
             accum_train_nsp_loss += nsp_loss.item()
@@ -176,6 +187,8 @@ def train_model(args: argparse.Namespace):
             writer.add_scalar('loss/batch_total_loss', loss.item(), global_step)
             writer.add_scalar('loss/batch_mlm_loss', masked_lm_loss.item(), global_step)
             writer.add_scalar('loss/batch_nsp_loss', nsp_loss.item(), global_step)
+            writer.add_scalar('accuracy/batch_mlm_acc', masked_lm_acc, global_step)
+            writer.add_scalar('accuracy/batch_nsp_acc', nsp_acc, global_step)
             writer.flush()
 
             if (global_step + 1) % valid_interval == 0:
@@ -233,7 +246,7 @@ def eval_model(
             masked_positions = batch['masked_positions'].to(device)
             masked_label_ids = batch['masked_label_ids'].to(device)
             masked_weights = batch['masked_weights'].to(device)
-            next_sentence_label = batch['next_sentence_label'].to(device)
+            next_sentence_labels = batch['next_sentence_label'].to(device)
 
             masked_lm_logits, nsp_logits, masked_lm_loss, nsp_loss = model(
                 input_ids,
@@ -242,17 +255,14 @@ def eval_model(
                 masked_positions=masked_positions,
                 masked_label_ids=masked_label_ids,
                 masked_weights=masked_weights,
-                next_sentence_label=next_sentence_label,
+                next_sentence_labels=next_sentence_labels,
             )
-
-            loss = masked_lm_loss + nsp_loss
             accum_valid_mlm_loss += masked_lm_loss.item()
             accum_valid_nsp_loss += nsp_loss.item()
 
             batch_iter.set_postfix({
                 'mlm_loss': masked_lm_loss.item(),
                 'nsp_loss': nsp_loss.item(),
-                'total_loss': loss.item(),
             })
 
     model.train(is_training)

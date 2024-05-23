@@ -9,6 +9,7 @@ import numpy as np
 
 import torch
 from torch import nn
+from torch import Tensor
 
 from model import BertBase
 
@@ -106,3 +107,45 @@ def clean_line(line: str) -> str:
     line = url_regex.sub('', line)
     line = emoji.replace_emoji(line, '')
     return line
+
+def compute_mlm_acc(
+    masked_lm_logits: Tensor,
+    masked_label_ids: Tensor,
+    masked_weights: Tensor,
+) -> float:
+    assert masked_lm_logits.dim() in (2, 3)  # (batch_size * seq_length, vocab_size) or (batch_size, seq_length, vocab_size)
+    assert masked_label_ids.dim() in (1, 2)  # (batch_size * seq_length) or (batch_size, seq_length)
+    assert masked_weights.dim() in (1, 2)
+    masked_lm_logits = masked_lm_logits.view(-1, masked_lm_logits.size(-1))
+    if masked_label_ids.dim() == 2:
+        masked_label_ids = masked_label_ids.view(-1)
+    if masked_weights.dim() == 2:
+        masked_weights = masked_weights.view(-1)
+    masked_lm_predictions = masked_lm_logits.argmax(-1)
+    masked_weights = masked_weights != 0.0
+    return compute_acc(
+        predictions=masked_lm_predictions,
+        labels=masked_label_ids,
+        weight=masked_weights,
+    )
+
+def compute_nsp_acc(
+    nsp_logits: Tensor,
+    next_sentence_labels: Tensor
+) -> float:
+    assert nsp_logits.dim() == 2  # (batch_size, num_classes)
+    assert next_sentence_labels.dim() == 1  # (batch_size,)
+    nsp_predictions = nsp_logits.argmax(-1)
+    return compute_acc(predictions=nsp_predictions, labels=next_sentence_labels)
+
+def compute_acc(predictions: Tensor, labels: Tensor, weight: Tensor | None = None) -> float:
+    if predictions.shape != labels.shape:
+        raise ValueError(
+            'Expected predictions and labels have the same shape, '
+            f'got {predictions.shape} and {labels.shape}'
+        )
+    diff = predictions == labels
+
+    if weight is not None:
+        diff = diff.masked_select(weight)
+    return diff.float().mean().item()

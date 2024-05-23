@@ -279,7 +279,7 @@ class BertForPretraining(BertBase):
         masked_positions: Tensor | None = None,
         masked_label_ids: Tensor | None = None,
         masked_weights: Tensor | None = None,
-        next_sentence_label: Tensor | None = None,
+        next_sentence_labels: Tensor | None = None,
     ) -> tuple[Tensor, Tensor, Tensor | None, Tensor | None]:
         """
         Args:
@@ -289,7 +289,7 @@ class BertForPretraining(BertBase):
             masked_positions: shape ``(batch_size, max_masked_tokens)``
             masked_label_ids: shape ``(batch_size, max_masked_tokens)``
             masked_weights: shape ``(batch_size, max_masked_tokens)``
-            next_sentence_label: shape ``(batch_size, 1)``
+            next_sentence_labels: shape ``(batch_size, 1)``
         """
 
         # encoder_output: (batch_size, seq_length, hidden_size)
@@ -302,15 +302,15 @@ class BertForPretraining(BertBase):
 
         masked_lm_logits = self.lm_head(encoder_output)  # (batch_size, seq_length, vocab_size)
         nsp_logits = self.nsp_head(pooled_output)  # (batch_size, 2)
-        masked_lm_loss = self.get_masked_lm_loss(
+        masked_lm_loss, masked_lm_gathered_logits = self.get_masked_lm_loss(
             masked_lm_logits,
             masked_positions,
             masked_label_ids,
             masked_weights
         )
-        nsp_loss = self.get_nsp_loss(nsp_logits, next_sentence_label)
+        nsp_loss = self.get_nsp_loss(nsp_logits, next_sentence_labels)
 
-        return masked_lm_logits, nsp_logits, masked_lm_loss, nsp_loss
+        return masked_lm_gathered_logits, nsp_logits, masked_lm_loss, nsp_loss
 
     def get_masked_lm_loss(
         self,
@@ -318,25 +318,25 @@ class BertForPretraining(BertBase):
         masked_positions: Tensor | None,
         masked_label_ids: Tensor | None,
         masked_weights: Tensor | None,
-    ) -> Tensor | None:
+    ) -> tuple[Tensor, Tensor] | tuple[None, None]:
         if (
             masked_positions is None or
             masked_label_ids is None or
             masked_weights is None
         ):
-            return None
+            return None, None
 
         # in masked language modeling, we use negative log-likelihood,
         # all unmasked tokens are ignored when calculating the loss
-        masked_lm_logits = gather_indices(masked_lm_logits, masked_positions)  # (batch_size * max_masked_tokens, hidden_size)
+        masked_lm_gathered_logits = gather_indices(masked_lm_logits, masked_positions)  # (batch_size * max_masked_tokens, hidden_size)
 
-        log_probs = F.log_softmax(masked_lm_logits, dim=-1)  # (batch_size * max_masked_tokens, vocab_size)
+        log_probs = F.log_softmax(masked_lm_gathered_logits, dim=-1)  # (batch_size * max_masked_tokens, vocab_size)
         masked_label_ids = self._reshape_batched_tensor(masked_label_ids)  # (batch_size * max_masked_tokens)
         masked_weights = self._reshape_batched_tensor(masked_weights)  # (batch_size * max_masked_tokens)
         nll = -log_probs[range(len(masked_label_ids)), masked_label_ids] * masked_weights  # (batch_size * max_masked_tokens)
         masked_lm_loss = torch.sum(nll) / (torch.sum(masked_weights) + 1e-5)
 
-        return masked_lm_loss
+        return masked_lm_loss, masked_lm_gathered_logits
 
     def get_nsp_loss(
         self,
@@ -347,7 +347,6 @@ class BertForPretraining(BertBase):
             return None
 
         # in next sentence prediction, we also use log-likelihood
-        # nsp_logits = self._reshape_batched_tensor(nsp_logits)  # (batch_size * 2)
         nsp_loss = F.cross_entropy(nsp_logits, next_sentence_label)
         return nsp_loss
 
