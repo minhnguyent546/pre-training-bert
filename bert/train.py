@@ -101,6 +101,8 @@ def train_model(args: argparse.Namespace):
     initial_global_step = 0
     accum_train_mlm_loss = 0.0
     accum_train_nsp_loss = 0.0
+    accum_train_mlm_acc = 0.0
+    accum_train_nsp_acc = 0.0
     if checkpoint_states is not None:
         model.load_state_dict(checkpoint_states['model'])
         optimizer.load_state_dict(checkpoint_states['optimizer'])
@@ -111,6 +113,10 @@ def train_model(args: argparse.Namespace):
             accum_train_mlm_loss = checkpoint_states['accum_train_mlm_loss']
         if 'accum_train_nsp_loss' in checkpoint_states:
             accum_train_nsp_loss = checkpoint_states['accum_train_nsp_loss']
+        if 'accum_train_mlm_acc' in checkpoint_states:
+            accum_train_mlm_acc = checkpoint_states['accum_train_mlm_acc']
+        if 'accum_train_nsp_acc' in checkpoint_states:
+            accum_train_nsp_acc = checkpoint_states['accum_train_nsp_acc']
 
     # mixed precision training with fp16
     train_dtype = torch.float32
@@ -183,6 +189,8 @@ def train_model(args: argparse.Namespace):
             })
             accum_train_mlm_loss += masked_lm_loss.item()
             accum_train_nsp_loss += nsp_loss.item()
+            accum_train_mlm_acc += masked_lm_acc
+            accum_train_nsp_acc += nsp_acc
 
             writer.add_scalar('loss/batch_total_loss', loss.item(), global_step)
             writer.add_scalar('loss/batch_mlm_loss', masked_lm_loss.item(), global_step)
@@ -205,9 +213,19 @@ def train_model(args: argparse.Namespace):
                     'train': (accum_train_mlm_loss + accum_train_nsp_loss) / valid_interval,
                     'valid': valid_results['loss'],
                 }, global_step + 1)
+                writer.add_scalars('accuracy/mlm', {
+                    'train': accum_train_mlm_acc / valid_interval,
+                    'valid': valid_results['mlm_acc'],
+                }, global_step + 1)
+                writer.add_scalars('accuracy/nsp', {
+                    'train': accum_train_nsp_acc / valid_interval,
+                    'valid': valid_results['nsp_acc'],
+                }, global_step + 1)
                 writer.flush()
                 accum_train_mlm_loss = 0.0
                 accum_train_nsp_loss = 0.0
+                accum_train_mlm_acc = 0.0
+                accum_train_nsp_acc = 0.0
 
             if (global_step + 1) % save_interval == 0:
                 checkpoint_dict = {
@@ -218,6 +236,8 @@ def train_model(args: argparse.Namespace):
                     'config': bert_config,
                     'accum_train_mlm_loss': accum_train_mlm_loss,
                     'accum_train_nsp_loss': accum_train_nsp_loss,
+                    'accum_train_mlm_acc': accum_train_mlm_acc,
+                    'accum_train_nsp_acc': accum_train_nsp_acc,
                 }
                 model_save_path = os.path.join(checkpoints_dir, f'bert-{global_step + 1}.pt')
                 torch.save(checkpoint_dict, model_save_path)
@@ -237,6 +257,8 @@ def eval_model(
 
     accum_valid_mlm_loss = 0.0
     accum_valid_nsp_loss = 0.0
+    accum_valid_mlm_acc = 0.0
+    accum_valid_nsp_acc = 0.0
     batch_iter = tqdm(eval_data_loader, desc='Evaluating model')
     with torch.no_grad():
         for batch in batch_iter:
@@ -257,8 +279,18 @@ def eval_model(
                 masked_weights=masked_weights,
                 next_sentence_labels=next_sentence_labels,
             )
+            masked_lm_acc = utils.compute_mlm_acc(
+                masked_lm_logits,
+                masked_label_ids,
+                masked_weights,
+            )
+            nsp_acc = utils.compute_nsp_acc(nsp_logits, next_sentence_labels)
+
             accum_valid_mlm_loss += masked_lm_loss.item()
             accum_valid_nsp_loss += nsp_loss.item()
+            accum_valid_mlm_acc += masked_lm_acc
+            accum_valid_nsp_acc += nsp_acc
+
 
             batch_iter.set_postfix({
                 'mlm_loss': masked_lm_loss.item(),
@@ -267,10 +299,13 @@ def eval_model(
 
     model.train(is_training)
 
+    num_iters = len(eval_data_loader)
     return {
         'loss': (accum_valid_mlm_loss + accum_valid_nsp_loss) / len(eval_data_loader),
-        'mlm_loss': accum_valid_mlm_loss / len(eval_data_loader),
-        'nsp_loss': accum_valid_nsp_loss / len(eval_data_loader),
+        'mlm_loss': accum_valid_mlm_loss / num_iters,
+        'nsp_loss': accum_valid_nsp_loss / num_iters,
+        'mlm_acc': accum_valid_mlm_acc / num_iters,
+        'nsp_acc': accum_valid_nsp_acc / num_iters,
     }
 
 def main():
