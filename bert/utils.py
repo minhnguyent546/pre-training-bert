@@ -8,6 +8,7 @@ import emoji
 import numpy as np
 
 import torch
+from torch import nn
 
 from model import BertBase
 
@@ -40,23 +41,64 @@ def ensure_dir(path: str) -> str:
     os.makedirs(path, exist_ok=True)
     return path
 
-def make_optimizer(model: BertBase, optim_type: str, lr: float, weight_decay: float = 0.0) -> torch.optim.Optimizer:
-    param_list = [param for param in model.parameters() if param.requires_grad]
-    decay_params = [param for param in param_list if param.dim() >= 2]
-    no_decay_params = [param for param in param_list if param.dim() < 2]
+def make_optimizer(
+    model: BertBase,
+    optim_type: str,
+    learning_rate: float,
+    beta_1: float = 0.9,
+    beta_2: float = 0.999,
+    epsilon: float = 1e-8,
+    weight_decay: float = 0.0,
+    exclude_module_list: tuple[nn.Module, ...] = (),
+) -> torch.optim.Optimizer:
+    decay_params = get_param_names(model, exclude_module_list)
+    # also exclude biases
+    decay_params = [name for name in decay_params if not name.endswith('bias')]
+
     param_groups = [
-        {'params': decay_params, 'weight_decay': weight_decay},
-        {'params': no_decay_params, 'weight_decay': 0.0},
+        {
+            'params': [param for name, param in model.named_parameters() if name in decay_params],
+            'weight_decay': weight_decay,
+        },
+        {
+            'params': [param for name, param in model.named_parameters() if name not in decay_params],
+            'weight_decay': 0.0,
+        },
     ]
     optim_type = optim_type.lower()
     if optim_type == 'adam':
-        optimizer = torch.optim.Adam(param_groups, lr)
+        optimizer = torch.optim.Adam(
+            param_groups,
+            learning_rate,
+            betas=(beta_1, beta_2),
+            eps=epsilon,
+        )
     elif optim_type == 'adamw':
-        optimizer = torch.optim.AdamW(param_groups, lr)
+        optimizer = torch.optim.AdamW(
+            param_groups,
+            learning_rate,
+            betas=(beta_1, beta_2),
+            eps=epsilon,
+        )
     else:
         raise ValueError(f'Unsupported optimizer type: {optim_type}. Possible values are: adam, adamw')
 
     return optimizer
+
+def get_param_names(
+    module: nn.Module,
+    exclude_module_list: tuple[nn.Module, ...] = (),
+) -> list[str]:
+    """Get parameter names but exclude those in `exclude_module_list`."""
+    param_names = []
+    for child_name, child in module.named_children():
+        if isinstance(child, exclude_module_list):
+            continue
+        child_result = get_param_names(child, exclude_module_list)
+        param_names.extend([f'{child_name}.{n}' for n in child_result])
+
+    param_names.extend(module._parameters.keys())
+    return param_names
 
 def clean_line(line: str) -> str:
     line = line.strip()

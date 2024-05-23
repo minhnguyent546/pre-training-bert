@@ -17,7 +17,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from model import BertBase, BertConfig, BertForPretraining
+from model import BertBase, BertConfig, BertForPretraining, LayerNorm
 import opts
 import utils
 
@@ -44,7 +44,7 @@ def train_model(args: argparse.Namespace):
         pin_memory=True,
     )
 
-    # model
+    # training device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
@@ -78,7 +78,13 @@ def train_model(args: argparse.Namespace):
     model.to(device)
     print(f'Model has {model.num_params()} parameters')
     learning_rate = args.learning_rate
-    optimizer = utils.make_optimizer(model, args.optim, lr=learning_rate, weight_decay=args.weight_decay)
+    optimizer = utils.make_optimizer(
+        model,
+        args.optim,
+        learning_rate=learning_rate,
+        weight_decay=args.weight_decay,
+        exclude_module_list=(LayerNorm,),
+    )
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda=lambda step: learning_rate * utils.noam_decay(

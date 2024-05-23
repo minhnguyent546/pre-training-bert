@@ -35,8 +35,8 @@ class BertConfig:
 class LayerNorm(nn.Module):
     def __init__(self, features, eps: float = 1e-7):
         super().__init__()
-        self.gamma = nn.Parameter(torch.ones(features))
-        self.beta = nn.Parameter(torch.zeros(features))
+        self.weight = nn.Parameter(torch.ones(features))
+        self.bias = nn.Parameter(torch.zeros(features))
         self.eps = eps
 
     def forward(self, x: Tensor) -> Tensor:
@@ -44,7 +44,7 @@ class LayerNorm(nn.Module):
         var = ((x - mean) ** 2).mean(dim=-1, keepdim=True)
         std = (var + self.eps).sqrt()
         y = (x - mean) / std
-        output = self.gamma * y + self.beta
+        output = self.weight * y + self.bias
         return output
 
 class BertEmbeddings(nn.Module):
@@ -54,7 +54,7 @@ class BertEmbeddings(nn.Module):
         self.position_embeddings = nn.Embedding(config.max_seq_length, config.hidden_size)
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 
-        self.norm = LayerNorm(config.hidden_size, eps=config.norm_eps)
+        self.layer_norm = LayerNorm(config.hidden_size, eps=config.norm_eps)
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(
@@ -74,7 +74,7 @@ class BertEmbeddings(nn.Module):
         # add positional embeddings and token type embeddings, then apply
         # layer normalization and dropout
         embeddings += self.position_embeddings(position_ids) + self.token_type_embeddings(token_type_ids)
-        embeddings = self.norm(embeddings)
+        embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
 
