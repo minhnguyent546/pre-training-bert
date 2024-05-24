@@ -102,11 +102,11 @@ def get_param_names(
     return param_names
 
 def clean_line(line: str) -> str:
-    line = line.strip()
+    line = line.encode('utf-8', 'ignore').decode()  # ignore non-utf-8 characters
     line = re.sub(r'[\u4e00-\u9fa5]+', '', line)
     line = url_regex.sub('', line)
     line = emoji.replace_emoji(line, '')
-    return line
+    return line.strip()
 
 def compute_mlm_acc(
     masked_lm_logits: Tensor,

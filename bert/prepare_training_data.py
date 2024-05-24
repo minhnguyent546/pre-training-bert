@@ -50,11 +50,12 @@ def create_training_instances(
                     documents.append([])
                     continue
                 tokens = tokenizer.encode(line)
+                if not tokens.tokens:  # a string contains only spaces will be encoded to an empty list!
+                    continue
                 documents[-1].append(tokens.tokens)
 
     # remove empty documents
     documents = [doc for doc in documents if doc]
-
     training_instances = []
 
     for _ in range(num_rounds):
@@ -302,7 +303,6 @@ def main():
     checkpoints_dir = utils.ensure_dir(args.checkpoints_dir)
     tokenizer_save_path = os.path.join(checkpoints_dir, args.tokenizer_basename)
     tokenizer = Tokenizer.from_file(tokenizer_save_path)
-
     training_instances = create_training_instances(
         args.data_file,
         tokenizer,
