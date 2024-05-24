@@ -265,8 +265,8 @@ class BertForPretraining(BertBase):
         self.lm_head = BertLMPredictionHead(config)
         self.nsp_head = BertNSPHead(config)
 
-        self._init_weights()
         self.lm_head.set_output_weights(self.get_input_embeddings())
+        self.post_init()
 
     def get_input_embeddings(self) -> nn.Embedding:
         return self.bert.embeddings.token_embeddings
@@ -347,7 +347,9 @@ class BertForPretraining(BertBase):
             return None
 
         # in next sentence prediction, we also use log-likelihood
-        nsp_loss = F.cross_entropy(nsp_logits, next_sentence_label)
+        log_probs = F.log_softmax(nsp_logits, dim=-1)  # (batch_size, 2)
+        nll = -log_probs[range(len(next_sentence_label)), next_sentence_label]  # (batch_size,)
+        nsp_loss = torch.mean(nll)
         return nsp_loss
 
     def _reshape_batched_tensor(self, x: Tensor) -> Tensor:
