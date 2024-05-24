@@ -135,7 +135,11 @@ def train_model(args: argparse.Namespace):
     save_interval = args.save_interval
     model.train()
 
-    train_progress_bar = tqdm(range(initial_global_step, train_steps), desc='Training model')
+    train_progress_bar = tqdm(
+        range(initial_global_step, train_steps),
+        desc='Training model',
+        position=0,
+    )
     global_step = initial_global_step
     while global_step < train_steps:
         torch.cuda.empty_cache()
