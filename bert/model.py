@@ -114,13 +114,13 @@ class MultiHeadAttention(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, config: BertConfig):
         super().__init__()
-        self.linear = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
         self.proj = nn.Linear(config.intermediate_size, config.hidden_size)
         self.activation = get_activation(config.activation)
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.linear(x)
+        x = self.dense(x)
         x = self.activation(x)
         x = self.dropout(x)
         x = self.proj(x)
@@ -181,13 +181,16 @@ class BertPooler(nn.Module):
     """
     def __init__(self, config: BertConfig):
         super().__init__()
-        self.linear = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
+        self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, encoder_output: Tensor) -> Tensor:
-        first_token_tensor = encoder_output[:, 0, :]
-        pooled_output = self.linear(first_token_tensor)
+        sentence_representation = encoder_output[:, 0, :]
+        pooled_output = self.dropout(sentence_representation)
+        pooled_output = self.dense(pooled_output)
         pooled_output = self.activation(pooled_output)
+        pooled_output = self.dropout(pooled_output)
         return pooled_output
 
 class Bert(BertBase):
