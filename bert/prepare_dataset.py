@@ -10,8 +10,8 @@ import opts
 import utils
 
 
-def preprocess(data_files, test_size: int, data_save_path: str):
-    raw_dataset = load_dataset('json', data_files=data_files)
+def preprocess(data_files, file_format: str, test_size: int, data_save_path: str):
+    raw_dataset = load_dataset(file_format, data_files=data_files)
 
     dataset = raw_dataset['train'].train_test_split(test_size=test_size, shuffle=True)
     utils.ensure_dir(data_save_path)
@@ -27,7 +27,7 @@ def main():
 
     utils.set_random_seed(args.seed)
 
-    preprocess(args.data_file, args.test_size, args.data_save_path)
+    preprocess(args.data_file, args.file_format, args.test_size, args.data_save_path)
 
 
 if __name__ == '__main__':

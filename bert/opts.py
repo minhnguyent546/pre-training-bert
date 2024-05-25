@@ -61,6 +61,12 @@ def _add_dataset_opts(parser: argparse.ArgumentParser, requires_data_file: bool 
         type=str,
     )
     group.add_argument(
+        '--file-format',
+        help='File format',
+        type=str,
+        default='json',
+    )
+    group.add_argument(
         '--data-save-path',
         help='Directory to save the processed data',
         type=str,
