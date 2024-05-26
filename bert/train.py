@@ -66,6 +66,7 @@ def train_model(args: argparse.Namespace):
             max_seq_length=args.seq_length,
             dropout=args.dropout,
             attn_dropout=args.attn_dropout,
+            pooler_dropout=args.pooler_dropout,
             activation=args.activation,
         )
     else:

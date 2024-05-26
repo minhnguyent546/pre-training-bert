@@ -20,7 +20,6 @@ import torch.nn.functional as F
 class BertConfig:
     vocab_size: int = 32_000
     type_vocab_size: int = 2  # used for token_type_ids, or 16 if we need more token types
-    max_masked_tokens: int = 10
     hidden_size: int = 768
     num_hidden_layers: int = 12
     num_heads: int = 12
@@ -28,6 +27,7 @@ class BertConfig:
     max_seq_length: int = 512
     dropout: float = 0.1
     attn_dropout: float = 0.1
+    pooler_dropout: float = 0.1
     norm_eps: float = 1e-7
     activation: str = 'gelu'
 
@@ -183,7 +183,7 @@ class BertPooler(nn.Module):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
-        self.dropout = nn.Dropout(config.dropout)
+        self.dropout = nn.Dropout(config.pooler_dropout)
 
     def forward(self, encoder_output: Tensor) -> Tensor:
         sentence_representation = encoder_output[:, 0, :]

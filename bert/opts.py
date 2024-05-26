@@ -130,6 +130,12 @@ def _add_model_opts(parser: argparse.ArgumentParser) -> None:
         default=0.1,
     )
     group.add_argument(
+        '--pooler-dropout',
+        help='Dropout rate in pooler',
+        type=float,
+        default=0.1,
+    )
+    group.add_argument(
         '--activation',
         help='Activation type',
         type=str,
