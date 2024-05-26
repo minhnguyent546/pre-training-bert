@@ -17,5 +17,5 @@ class SpecialToken:
             SpecialToken.CLS,
             SpecialToken.SEP,
             SpecialToken.UNK,
-            SpecialToken.PAD
+            SpecialToken.PAD,
         ]

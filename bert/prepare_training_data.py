@@ -10,6 +10,10 @@ import os
 import random
 from typing import TypeAlias
 
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+
 from tokenizers import Tokenizer
 
 from tqdm import tqdm
@@ -172,14 +176,28 @@ def create_training_instances_from_doc(
         i += 1
     return training_instances
 
-def write_training_instances_to_json(
+def write_training_instances(
     output_file: str,
+    format: str,
     training_instances: list[TrainingInstance],
     tokenizer: Tokenizer,
     max_seq_length: int,
     max_masked_tokens: int,
+    save_tokens: bool = False,
 ) -> None:
     content = []
+    headers = [
+        'input_ids',
+        'input_mask',
+        'segment_ids',
+        'masked_positions',
+        'masked_label_ids',
+        'masked_weights',
+        'next_sentence_label',
+    ]
+    if save_tokens:
+        headers.extend(['source_tokens', 'target_tokens'])
+
     pad_token_id = tokenizer.token_to_id(SpecialToken.PAD)
     for instance in training_instances:
         input_ids = [tokenizer.token_to_id(token) for token in instance.tokens]
@@ -215,9 +233,18 @@ def write_training_instances_to_json(
             'masked_weights': masked_weights,
             'next_sentence_label': 1 if is_next else 0,
         })
+        if save_tokens:
+            content[-1]['source_tokens'] = instance.tokens
+            content[-1]['target_tokens'] = instance.masked_labels
 
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(content, f, ensure_ascii=False)
+    df = pd.DataFrame(content, columns=headers)
+    if format == 'csv':
+        df.to_csv(output_file, index=False)
+    elif format == 'parquet':
+        table = pa.Table.from_pandas(df)
+        pq.write_table(table, output_file)
+    else:
+        raise ValueError(f'Unsupported format: {format}')
 
     print(f'Wrote {len(content)} training instances to {output_file}')
 
@@ -249,6 +276,8 @@ def mask_input_tokens(
     )
     masked: list[tuple[int, TokenType]] = []
     for cand in cand_indices:
+        if len(masked) >= num_masked_tokens:
+            break
         if len(masked) + len(cand) > num_masked_tokens:
             continue
         for index in cand:
@@ -314,12 +343,14 @@ def main():
         short_seq_prob=args.short_seq_prob,
         is_next_prob=args.is_next_prob,
     )
-    write_training_instances_to_json(
+    write_training_instances(
         args.output_file,
+        args.format,
         training_instances,
         tokenizer,
         args.max_seq_length,
         args.max_masked_tokens,
+        args.save_tokens,
     )
 
 

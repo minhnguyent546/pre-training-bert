@@ -5,6 +5,7 @@ requires: python >= 3.10
 
 import argparse
 import os
+from tqdm.autonotebook import tqdm
 
 from tokenizers import AddedToken, Tokenizer
 import tokenizers
@@ -50,7 +51,7 @@ def build_tokenizer(data_files: str | list[str], vocab_size: int, save_path: str
     data = []
     for data_file in data_files:
         with open(data_file, 'r', encoding='utf-8') as f:
-            for line in f:
+            for line in tqdm(f, desc='Reading file', unit='lines'):
                 line = utils.clean_line(line)
                 data.append(line)
 

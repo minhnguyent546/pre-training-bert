@@ -1,2 +1,5 @@
 __pycache__
 /config/config-local.yaml
+/_test
+/_datasets
+.ipynb_checkpoints

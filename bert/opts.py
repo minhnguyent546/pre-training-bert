@@ -158,6 +158,18 @@ def _add_data_prepare_opts(parser: argparse.ArgumentParser) -> None:
         default='./datasets/training_instances.json',
     )
     group.add_argument(
+        '--format',
+        help='Format of the output file',
+        type=str,
+        choices=['csv', 'parquet'],
+        default='csv',
+    )
+    group.add_argument(
+        '--save-tokens',
+        help='Wheter to save source and target tokens',
+        action='store_true',
+    )
+    group.add_argument(
         '--num-rounds',
         help='Number of times to duplicate the input data (with different masks)',
         type=int,
