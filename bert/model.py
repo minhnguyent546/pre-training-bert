@@ -313,7 +313,7 @@ class BertForPretraining(BertBase):
         )
         nsp_loss = self.get_nsp_loss(nsp_logits, next_sentence_labels)
 
-        return masked_lm_gathered_logits, nsp_logits, masked_lm_loss, nsp_loss
+        return masked_lm_gathered_logits or masked_lm_logits, nsp_logits, masked_lm_loss, nsp_loss
 
     def get_masked_lm_loss(
         self,
